@@ -1,0 +1,2 @@
+# HeadlineService
+NEWS Headline wordcloud service using Django
