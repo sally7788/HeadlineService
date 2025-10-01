@@ -1,8 +1,10 @@
 # news/naver_crawler.py
-
+import re
 import os
 import django
 import time
+import json
+import requests
 from datetime import datetime
 from django.utils import timezone
 
@@ -14,6 +16,11 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from news.models import News, Publisher
+from news.serializers import NewsSerializer
+
+# 제목 전처리 함수
+def clean_title(title):
+    return re.sub(r"\[[^\]]*\]", "", title).strip()
 
 # Selenium 드라이버 설정
 def get_driver():
@@ -32,6 +39,7 @@ def crawl_naver_news():
 
     now = datetime.now()
     boxes = driver.find_elements(By.CSS_SELECTOR, ".rankingnews_box")
+    backend_url = 'http://127.0.0.1:8000/news/news/'  # POST할 서버 URL
 
     for box in boxes:
         try:
@@ -42,11 +50,11 @@ def crawl_naver_news():
             for article in articles:
                 try:
                     link = article.find_element(By.TAG_NAME, "a")
-                    title = link.text.strip()
+                    title = clean_title(link.text.strip())
                     href = link.get_attribute("href")
 
                     # 중복 뉴스는 건너뜀
-                    if News.objects.filter(url=href).exists():
+                    if not title or News.objects.filter(url=href).exists():
                         continue
 
                     # 상세 페이지 접속 후 발행일 추출
@@ -69,15 +77,30 @@ def crawl_naver_news():
                     driver.close()
                     driver.switch_to.window(driver.window_handles[0])
 
-                    # DB에 저장
-                    News.objects.create(
+                    # News 객체 DB에 저장
+                    news_obj = News.objects.create(
                         publisher=publisher,
                         title=title,
                         url=href,
                         published_date=published_date,
                         crawled_at=now,
+                        view_count=0
                     )
 
+                # POST 요청용 딕셔너리 생성
+                    data = {
+                        "title": news_obj.title,
+                        "url": news_obj.url,
+                        "published_date": news_obj.published_date.isoformat(),
+                        "crawled_at": news_obj.crawled_at.isoformat(),
+                        "view_count": news_obj.view_count,
+                        "publishers": publisher.name
+                    }
+
+                    #서버로 POST
+                    response = requests.post(backend_url, json=data)
+                    print(f"[{response.status_code}] {news_obj.title}")
+                  
                 except Exception as e:
                     print("기사 처리 오류:", e)
                     continue
@@ -87,7 +110,7 @@ def crawl_naver_news():
             continue
 
     driver.quit()
-    print("크롤링 및 저장 완료.")
+    print("전체 크롤링 및 POST 완료")
 
 # 실행
 if __name__ == "__main__":
