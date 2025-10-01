@@ -7,8 +7,12 @@ from rest_framework.response import Response
 
 class PublisherList(generics.ListCreateAPIView):
     queryset = Publisher.objects.all()
-    serializer_class = Publisher
+    serializer_class = PublisherSerializer
 
 class NewsList(generics.ListCreateAPIView):
     queryset = News.objects.all()
-    serializer_class = News
+    serializer_class = NewsSerializer
+
+class DeletePublisher(generics.RetrieveDestroyAPIView):
+    queryset = Publisher.objects.all()
+    serializer_class = PublisherSerializer
