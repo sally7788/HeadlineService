@@ -1,0 +1,147 @@
+from .models import CrawledData
+from django.http import JsonResponse
+from django.http import HttpResponse
+from django.utils import timezone
+import datetime
+import time
+import re
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+def crawl_youtube_data(request, urls=[], max_videos=80):
+    """
+    유튜브 링크로 접속해서 무한 스크롤을 하여 받아온 비디오 갯수만큼의 데이터를 크롤링
+    """
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    driver = webdriver.Chrome(options=chrome_options)
+    
+    urls = [
+        "https://www.youtube.com/@MBCNEWS11/videos",
+        "https://www.youtube.com/@sbsnews8/videos",
+        "https://www.youtube.com/@newskbs/videos",
+    ]
+
+    try:
+        for url in urls:
+            driver.get(url)
+            wait = WebDriverWait(driver, 10)
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "ytd-rich-item-renderer")))
+            SCROLL_PAUSE_TIME = 2
+            last_height = driver.execute_script("return document.documentElement.scrollHeight")
+
+            #정해진 비디오 갯수가 로딩될 때까지 무한 스크롤링
+            while True:
+                driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight);")
+                time.sleep(SCROLL_PAUSE_TIME)
+                
+                current_videos = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
+                
+                if len(current_videos) >= max_videos:
+                    print(f"로딩({max_videos}개) 성공!")
+                    break
+                
+                new_height = driver.execute_script("return document.documentElement.scrollHeight")
+                if new_height == last_height:
+                    print("더 이상 로드할 영상이 없습니다.")
+                    break
+                
+                last_height = new_height
+            
+            #스크롤링으로 로딩한 비디오 수가 만족할때 데이터 크롤링
+            video_containers = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")[:max_videos]
+            channel_element = driver.find_element(By.CSS_SELECTOR, "span.yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap")
+            channel_name = channel_element.text.strip()
+
+            for container in video_containers:
+                title_text = ""
+                video_url = ""
+                view_count = 0
+                upload_date = None
+                publisher = channel_name
+
+                title_element = container.find_element(By.CSS_SELECTOR, "#video-title")
+                title_text = title_element.text.strip()
+                video_url = container.find_element(By.CSS_SELECTOR, '#video-title-link').get_attribute('href')
+                metadatas = container.find_elements(By.CSS_SELECTOR, "span")
+                for span in metadatas:
+                    span_text = span.text.strip()
+
+                    # 조회수 추출
+                    if ('조회수' in span_text or '회' in span_text) and view_count == 0:
+                        view_count = trans_view_count(span_text)
+                    
+                    # 업로드 날짜 추출
+                    elif any(keyword in span_text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) and upload_date is None:
+                        upload_date = trans_upload_date(span_text)
+
+                print(title_text,video_url,publisher,view_count,upload_date)
+                
+                obj, created = CrawledData.objects.update_or_create(
+                    title=title_text,
+                    url=video_url,
+                    defaults={
+                        'publisher': publisher,
+                        'view_count': view_count,
+                        'published_date': upload_date,
+                    }
+                )
+
+        return JsonResponse({
+                'status': 'success',
+                'count': len(video_containers)
+            })
+    
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'크롤링 중 오류가 발생했습니다: {str(e)}'
+        })
+        
+    finally:
+        driver.quit()
+    
+
+def trans_view_count(view) :
+    """
+    조회수 텍스트를 숫자로 변환
+    """
+    view_text = view.replace('조회수', '').replace('회', '').strip()
+    view_text = view_text.replace('.', '')
+
+    if '만' in view_text:
+        number_str = int(view_text.replace('만', ''))
+        number = float(number_str) 
+        return int(number * 10000) 
+    elif '천' in view_text:
+        number_str = view_text.replace('천', '')
+        number = float(number_str)
+        return int(number * 1000)
+    else:
+        number = int(view_text)
+        return number
+
+    
+def trans_upload_date(date_text):
+    """
+    업로드 날짜 텍스트로 업로드 시간 계산
+    """
+    now = timezone.now()
+    time = int(re.findall(r'\d+', date_text)[0])
+
+    if '분 전' in date_text:
+            upload_time = now - datetime.timedelta(minutes=time)
+    elif '시간 전' in date_text:
+        upload_time = now - datetime.timedelta(hours=time)
+    elif '일 전' in date_text:
+        upload_time = now - datetime.timedelta(days=time)
+    elif '주 전' in date_text:
+        upload_time = now - datetime.timedelta(weeks=time)
+    else:
+            return date_text
+
+    return upload_time.date()
