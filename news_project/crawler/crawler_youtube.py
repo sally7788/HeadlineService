@@ -1,10 +1,10 @@
-from .models import CrawledData
 from django.http import JsonResponse
 from django.http import HttpResponse
 from django.utils import timezone
 import datetime
 import time
 import re
+import requests
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -12,7 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_youtube_data(request, urls=[], max_videos=80):
+def crawl_youtube_data(request, urls=[], max_videos=10):
     """
     유튜브 링크로 접속해서 무한 스크롤을 하여 받아온 비디오 갯수만큼의 데이터를 크롤링
     """
@@ -22,8 +22,10 @@ def crawl_youtube_data(request, urls=[], max_videos=80):
     
     urls = [
         "https://www.youtube.com/@MBCNEWS11/videos",
-        "https://www.youtube.com/@sbsnews8/videos",
-        "https://www.youtube.com/@newskbs/videos",
+        #"https://www.youtube.com/@sbsnews8/videos",
+        #"https://www.youtube.com/@newskbs/videos",
+        #"https://www.youtube.com/@jtbc_news/videos",
+        #"https://www.youtube.com/@ytnnews24/videos",
     ]
 
     try:
@@ -78,18 +80,18 @@ def crawl_youtube_data(request, urls=[], max_videos=80):
                     # 업로드 날짜 추출
                     elif any(keyword in span_text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) and upload_date is None:
                         upload_date = trans_upload_date(span_text)
-
-                print(title_text,video_url,publisher,view_count,upload_date)
                 
-                obj, created = CrawledData.objects.update_or_create(
-                    title=title_text,
-                    url=video_url,
-                    defaults={
-                        'publisher': publisher,
-                        'view_count': view_count,
-                        'published_date': upload_date,
-                    }
-                )
+                now = datetime.datetime.now().isoformat()
+                
+                crawled_data = {
+                    "title": title_text,
+                    "publisher_id": publisher,
+                    "url": video_url,
+                    "view_count": view_count,
+                    "published_date": upload_date,
+                    "crawled_at": now,
+                }
+                db_save(crawled_data)
 
         return JsonResponse({
                 'status': 'success',
@@ -134,7 +136,7 @@ def trans_upload_date(date_text):
     time = int(re.findall(r'\d+', date_text)[0])
 
     if '분 전' in date_text:
-            upload_time = now - datetime.timedelta(minutes=time)
+        upload_time = now - datetime.timedelta(minutes=time)
     elif '시간 전' in date_text:
         upload_time = now - datetime.timedelta(hours=time)
     elif '일 전' in date_text:
@@ -142,6 +144,46 @@ def trans_upload_date(date_text):
     elif '주 전' in date_text:
         upload_time = now - datetime.timedelta(weeks=time)
     else:
-            return date_text
+        return now
 
-    return upload_time.date()
+    return upload_time
+
+
+def db_save(data):
+    backend_url = 'http://127.0.0.1:8000/news/news/'
+
+    try:
+        if data['published_date']:
+            published_date_str = data['published_date'].isoformat()
+            if published_date_str.endswith('+00:00'):
+                published_date_str = published_date_str.replace('+00:00', 'Z')
+            elif not published_date_str.endswith('Z'):
+                published_date_str += 'Z'
+        else:
+            published_date_str = None
+
+        api_data = {
+            "title": data['title'],
+            "publisher_id": data['publisher_id'],
+            "url": data['url'],
+            "published_date": published_date_str,
+            "view_count": data['view_count'],
+            "crawled_at": data['crawled_at'] + "Z"
+        }
+        
+        response = requests.post(
+            backend_url, 
+            json=api_data,
+            headers={'Content-Type': 'application/json'},
+            timeout=10
+        )
+        
+        if response.status_code in [200, 201]:
+            return True
+        else:
+            print(f"Failed to send data. Status code: {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"Unexpected error in db_save: {e}")
+        return False
