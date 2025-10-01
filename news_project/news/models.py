@@ -15,3 +15,5 @@ class News(models.Model):
     published_date = models.DateTimeField(verbose_name='최초 발행일')
     view_count = models.IntegerField(verbose_name='조회수')
     crawled_at = models.DateTimeField(verbose_name='최종 크롤링 시점')
+
+# 결과, 결과목록, 빈도수 데이터?
