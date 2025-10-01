@@ -7,7 +7,7 @@ class PublisherSerializer(serializers.ModelSerializer):
         fields = ['name']
 
     def create(self, validated_data):
-        publisher = validated_data['name']
+        publisher = Publisher.objects.create(name=validated_data['name'])
         publisher.save()
         return publisher
 
@@ -19,7 +19,7 @@ class NewsSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         news = News.objects.create(
             title=validated_data['title'],
-            publisher_id=validated_data['publiser_id'],
+            publisher_id=Publisher.objects.get_or_create(name=validated_data['publisher_id']),
             url=validated_data['url'],
             published_date=validated_data['published_date'],
             view_count=validated_data['view_count'],
