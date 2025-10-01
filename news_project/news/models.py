@@ -17,3 +17,4 @@ class News(models.Model):
     crawled_at = models.DateTimeField(verbose_name='최종 크롤링 시점')
 
 # 결과, 결과목록, 빈도수 데이터?
+# 브랜치 시범 pr
