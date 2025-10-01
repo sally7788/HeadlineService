@@ -4,14 +4,14 @@ from .models import *
 class PublisherSerializer(serializers.ModelSerializer):
     class Meta:
         model = Publisher
-        fields = ['name']
+        fields = ['id', 'name']
 
 class NewsSerializer(serializers.ModelSerializer):
     publisher_id = serializers.CharField()
 
     class Meta:
         model = News
-        fields = ['title', 'publisher_id', 'url', 'published_date', 'view_count', 'crawled_at']
+        fields = ['id', 'title', 'publisher_id', 'url', 'published_date', 'view_count', 'crawled_at']
         
     def create(self, validated_data):
         publisher_name = validated_data.pop("publisher_id")
