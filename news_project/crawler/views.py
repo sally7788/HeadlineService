@@ -1,6 +1,8 @@
 from django.http import HttpResponse
 from . import crawler_youtube
+from rest_framework.decorators import api_view
 
+@api_view(['GET', 'POST'])
 def youtube_crawling(request):
     """YouTube 크롤링을 실행하고 간단한 응답 반환"""
     try:
