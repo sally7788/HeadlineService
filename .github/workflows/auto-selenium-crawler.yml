@@ -6,7 +6,8 @@ name: Auto Selenium Crawler
 on:
   schedule:
     - cron: "0 * * * *" # Run every hour
-
+  workflow_dispatch:
+  
 jobs:
   build:
 
