@@ -3,3 +3,4 @@ konlpy
 drf-yasg
 djangorestframework
 selenium
+webdriver_manager
