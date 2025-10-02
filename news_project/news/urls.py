@@ -4,6 +4,7 @@ from .views import *
 app_name = 'polls'
 urlpatterns = [
     path('news/', NewsList.as_view(), name='newslist'),
+    path('news/<int:pk>/', NewsDetail.as_view(), name='newsdetail'),
     path('publisher/', PublisherList.as_view(), name='publisherlist'),
-    path('delete_publisher/<int:pk>', DeletePublisher.as_view(), name='deletepublisher')
+    path('publisher/<int:pk>/', NewsDetail.as_view(), name='publisherdetail'),
 ]
