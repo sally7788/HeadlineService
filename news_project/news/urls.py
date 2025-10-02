@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import *
 
-app_name = 'news'
+app_name = 'newsproject'
 urlpatterns = [
     path('', NewsList.as_view(), name='newslist'),
     path('<int:pk>/', NewsDetail.as_view(), name='newsdetail'),
