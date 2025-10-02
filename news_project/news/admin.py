@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from django.contrib import admin
-from .models import Publisher, News, WordCloudResult
+from .models import Publisher, Headline, WordCloudResult
 
 # Django Admin 커스터마이징을 위한 데ко레이터 방식(@admin.register)을 사용하면 더 깔끔합니다.
 
@@ -12,9 +12,9 @@ class PublisherAdmin(admin.ModelAdmin):
     search_fields = ('name',)      # name 필드로 검색 기능 추가
 
 
-@admin.register(News)
-class NewsAdmin(admin.ModelAdmin):
-    """ News 모델을 위한 관리자 설정 """
+@admin.register(Headline)
+class HeadlineAdmin(admin.ModelAdmin):
+    """ Headline 모델을 위한 관리자 설정 """
     list_display = ('id', 'title', 'get_publisher_name', 'published_date', 'view_count') # 목록에 표시할 필드
     list_filter = ('published_date', 'publisher_id__name') # 발행일과 발행처 이름으로 필터 기능 추가
     search_fields = ('title',)  # 제목으로 검색 기능 추가

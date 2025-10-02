@@ -40,7 +40,7 @@ def get_wordcloud_data(request):
     start_date_req = request.GET.get('start_date')
     end_date_req = request.GET.get('end_date')
     
-    #publisher_ids를 어떻게 받아오지? 복수니까 리스트 찾아보기 
+    
     publishers_param= request.GET.get('publishers', '') 
     publisher_ids_req = []
 
