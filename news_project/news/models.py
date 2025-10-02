@@ -5,16 +5,24 @@ from django.db import models
 # models.*field docs
 # https://docs.djangoproject.com/en/5.2/ref/models/fields/#django.db.models.TextField
 
+
 class Publisher(models.Model):
-    name = models.CharField(max_length=90, verbose_name='발행처 이름 (예: YTN, 조선일보, KBS News)')
+    name = models.CharField(
+        max_length=90, verbose_name='발행처 이름 (예: YTN, 조선일보, KBS News)')
+
+    def __str__(self):
+        return self.name
+
 
 class News(models.Model):
     title = models.CharField(max_length=180, verbose_name='기사/영상 제목')
-    publisher_id = models.ForeignKey(Publisher, on_delete=models.CASCADE, related_name='news_list')
+    publisher_id = models.ForeignKey(
+        Publisher, on_delete=models.CASCADE, related_name='news_list')
     url = models.URLField(max_length=300, verbose_name='기사/영상 원본 URL')
     published_date = models.DateTimeField(verbose_name='최초 발행일')
     view_count = models.IntegerField(verbose_name='조회수')
     crawled_at = models.DateTimeField(verbose_name='최종 크롤링 시점')
+
 
 class WordCloudResult(models.Model):
     # Many-to-Many 관계: Publisher 모델 참조로 변경
@@ -39,8 +47,10 @@ class WordCloudResult(models.Model):
         null=True,
         verbose_name="이미지 파일 경로"
     )
+
     def __str__(self):
         return f"WC Result: {self.start_date} ~ {self.end_date}"
+
     class Meta:
         verbose_name = "워드클라우드 결과"
         verbose_name_plural = "워드클라우드 결과 목록"
