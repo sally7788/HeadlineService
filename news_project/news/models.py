@@ -14,7 +14,7 @@ class Publisher(models.Model):
         return self.name
 
 
-class News(models.Model):
+class Headline(models.Model):
     title = models.CharField(max_length=180, verbose_name='기사/영상 제목')
     publisher_id = models.ForeignKey(
         Publisher, on_delete=models.CASCADE, related_name='news_list')

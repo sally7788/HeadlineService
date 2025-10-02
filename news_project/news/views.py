@@ -16,11 +16,11 @@ class PublisherDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PublisherSerializer
 
 
-class NewsList(generics.ListCreateAPIView):
-    queryset = News.objects.all()
-    serializer_class = NewsSerializer
+class HeadlineList(generics.ListCreateAPIView):
+    queryset = Headline.objects.all()
+    serializer_class = HeadlineSerializer
 
 
-class NewsDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = News.objects.all()
-    serializer_class = NewsSerializer
+class HeadlineDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Headline.objects.all()
+    serializer_class = HeadlineSerializer
