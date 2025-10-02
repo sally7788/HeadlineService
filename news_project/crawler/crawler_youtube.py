@@ -12,7 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_youtube_data(request, urls=[]):
+def crawl_youtube_data(request, crawl_until=1):
     """
     유튜브 링크로 접속해서 무한 스크롤을 하여 받아온 비디오 갯수만큼의 데이터를 크롤링
     """
@@ -43,14 +43,14 @@ def crawl_youtube_data(request, urls=[]):
                 
                 current_videos = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
                 elements = current_videos[-1].find_elements(By.CSS_SELECTOR, "span")
-                extracted_number = 0
+                extracted_date = 0
                 for span in elements:
                     span_text = span.text.strip()
                     
                     if any(keyword in span_text for keyword in ['일 전']):
-                        extracted_number = int(re.search(r'(\d+)', span_text).group(1))
+                        extracted_date = int(re.search(r'(\d+)', span_text).group(1))
                 
-                if extracted_number >= 1:
+                if extracted_date >= crawl_until:
                     print(f"로딩 성공!")
                     break
                 
@@ -157,7 +157,7 @@ def trans_upload_date(date_text):
 
 
 def db_save(data):
-    backend_url = 'http://127.0.0.1:8000/news/news/'
+    backend_url = 'http://127.0.0.1:8000/news/headline/'
 
     try:
         api_data = {
