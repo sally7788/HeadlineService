@@ -12,7 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_youtube_data(request, urls=[], max_videos=10):
+def crawl_youtube_data(request, urls=[]):
     """
     유튜브 링크로 접속해서 무한 스크롤을 하여 받아온 비디오 갯수만큼의 데이터를 크롤링
     """
@@ -42,9 +42,16 @@ def crawl_youtube_data(request, urls=[], max_videos=10):
                 time.sleep(SCROLL_PAUSE_TIME)
                 
                 current_videos = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
+                elements = current_videos[-1].find_elements(By.CSS_SELECTOR, "span")
+                extracted_number = 0
+                for span in elements:
+                    span_text = span.text.strip()
+                    
+                    if any(keyword in span_text for keyword in ['일 전']):
+                        extracted_number = int(re.search(r'(\d+)', span_text).group(1))
                 
-                if len(current_videos) >= max_videos:
-                    print(f"로딩({max_videos}개) 성공!")
+                if extracted_number >= 1:
+                    print(f"로딩 성공!")
                     break
                 
                 new_height = driver.execute_script("return document.documentElement.scrollHeight")
@@ -55,7 +62,7 @@ def crawl_youtube_data(request, urls=[], max_videos=10):
                 last_height = new_height
             
             #스크롤링으로 로딩한 비디오 수가 만족할때 데이터 크롤링
-            video_containers = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")[:max_videos]
+            video_containers = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
             channel_element = driver.find_element(By.CSS_SELECTOR, "span.yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap")
             channel_name = channel_element.text.strip()
 
