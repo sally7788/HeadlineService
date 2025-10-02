@@ -27,5 +27,5 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        python ./news/auto_crawl.py
+        python news_project/news/auto_crawl.py
 
