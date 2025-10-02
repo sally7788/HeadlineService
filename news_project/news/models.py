@@ -19,7 +19,7 @@ class Headline(models.Model):
     publisher_id = models.ForeignKey(
         Publisher, on_delete=models.CASCADE, related_name='news_list')
     url = models.URLField(max_length=300, verbose_name='기사/영상 원본 URL')
-    published_date = models.DateTimeField(verbose_name='최초 발행일')
+    published_date = models.DateField(verbose_name='최초 발행일')
     view_count = models.IntegerField(verbose_name='조회수')
     crawled_at = models.DateTimeField(verbose_name='최종 크롤링 시점')
 
