@@ -1,6 +1,6 @@
-from django.shortcuts import render
+from django.http import HttpResponseRedirect
 from .serializers import *
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.response import Response
 from django.http import JsonResponse
 from django.db.models import Count
@@ -23,6 +23,18 @@ class PublisherDetail(generics.RetrieveUpdateDestroyAPIView):
 class HeadlineList(generics.ListCreateAPIView):
     queryset = Headline.objects.all()
     serializer_class = HeadlineSerializer
+
+    def post(self, request, *args, **kwargs):
+        title = request.data.get('title')
+
+        if self.queryset.filter(title=title).exists():
+            instance = Headline.objects.get(title=title)
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return self.create(request, *args, **kwargs)
 
 
 class DeletePublisher(generics.RetrieveDestroyAPIView):

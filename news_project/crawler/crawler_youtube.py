@@ -75,6 +75,17 @@ def crawl_youtube_data(request, crawl_until=1):
 
                 title_element = container.find_element(By.CSS_SELECTOR, "#video-title")
                 title_text = title_element.text.strip()
+                title_text = re.sub(r'\[.*?\]', '', title_text)
+                title_text = re.sub(r'\(.*?\)', '', title_text)
+                title_text = re.sub(r'\s*/.*$', '', title_text)
+                title_text = re.sub(r'\s*ㅣ.*$', '', title_text)
+                title_text = re.sub(r'\s*｜.*$', '', title_text)
+                title_text = re.sub(r'\s*\|.*$', '', title_text)
+                title_text = re.sub(r'\s*#.*$', '', title_text)
+                title_text = re.sub(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title_text)
+                title_text = re.sub(r'\d{4}\.\s*\d{1,2}\.\s*\d{1,2}', '', title_text)
+                title_text = re.sub(r'\s*(다시보기|뉴스룸|뉴스데스크)\s*', ' ', title_text)
+                title_text = re.sub(r'\s+', ' ', title_text).strip()
                 video_url = container.find_element(By.CSS_SELECTOR, '#video-title-link').get_attribute('href')
                 metadatas = container.find_elements(By.CSS_SELECTOR, "span")
                 for span in metadatas:
