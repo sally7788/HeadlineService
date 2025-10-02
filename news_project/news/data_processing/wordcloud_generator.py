@@ -3,6 +3,7 @@ from collections import Counter
 import json
 from konlpy.tag import Okt # 한국어 형태소 분석기 (설치 필요)
 from django.db.models import Q, Min, Max
+from datetime import datetime, timedelta
 
 from ..models import News, Publisher, WordCloudResult
 
@@ -22,7 +23,14 @@ def generate_word_frequencies(start_date: date=None, end_date: date=None, select
         filters &= Q(publisher_id__in=selected_publisher_ids)
         
     if start_date and end_date:# start_date와 end_date가 모두 제공된 경우에만 필터링
-        filters &= Q(published_date__range=(start_date, end_date))
+        try: 
+            end_date_obj  = datetime.strptime(end_date, '%Y-%m-%d')
+            adjusted_end_date = end_date_obj + timedelta(days=1)
+            filters &= Q(published_date__gte=start_date) & Q(published_date__lt=adjusted_end_date)
+        
+        except ValueError:
+            print(">> 날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.")
+            return None
     
     # 1. 데이터 필터링 및 조회: title과 view_count를 함께 가져와야 가중치 적용이 가능합니다.
     # view_count가 없는 경우를 대비해 기본값 0을 적용합니다.
@@ -87,7 +95,7 @@ def generate_word_frequencies(start_date: date=None, end_date: date=None, select
     result_obj.included_publishers.set(publishers_to_log)
     
     print(f">> WordCloud 가중치 결과 저장 완료. ID: {result_obj.id}. 기간: {final_start_date} ~ {final_end_date}")
-    return result_obj.id
+    return result_obj
 
 # 사용 예시 (특정 신문사 1, 2, 3으로 2025-09-01부터 2025-09-30까지 실행)
 # generate_word_frequencies(date(2025, 9, 1), date(2025, 9, 30), [1, 2, 3])

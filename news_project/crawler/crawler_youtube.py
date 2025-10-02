@@ -12,7 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_youtube_data(request, urls=[]):
+def crawl_youtube_data(request, crawl_until=1):
     """
     유튜브 링크로 접속해서 무한 스크롤을 하여 받아온 비디오 갯수만큼의 데이터를 크롤링
     """
@@ -43,14 +43,14 @@ def crawl_youtube_data(request, urls=[]):
                 
                 current_videos = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
                 elements = current_videos[-1].find_elements(By.CSS_SELECTOR, "span")
-                extracted_number = 0
+                extracted_date = 0
                 for span in elements:
                     span_text = span.text.strip()
                     
                     if any(keyword in span_text for keyword in ['일 전']):
-                        extracted_number = int(re.search(r'(\d+)', span_text).group(1))
+                        extracted_date = int(re.search(r'(\d+)', span_text).group(1))
                 
-                if extracted_number >= 1:
+                if extracted_date >= crawl_until:
                     print(f"로딩 성공!")
                     break
                 
@@ -75,6 +75,17 @@ def crawl_youtube_data(request, urls=[]):
 
                 title_element = container.find_element(By.CSS_SELECTOR, "#video-title")
                 title_text = title_element.text.strip()
+                title_text = re.sub(r'\[.*?\]', '', title_text)
+                title_text = re.sub(r'\(.*?\)', '', title_text)
+                title_text = re.sub(r'\s*/.*$', '', title_text)
+                title_text = re.sub(r'\s*ㅣ.*$', '', title_text)
+                title_text = re.sub(r'\s*｜.*$', '', title_text)
+                title_text = re.sub(r'\s*\|.*$', '', title_text)
+                title_text = re.sub(r'\s*#.*$', '', title_text)
+                title_text = re.sub(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title_text)
+                title_text = re.sub(r'\d{4}\.\s*\d{1,2}\.\s*\d{1,2}', '', title_text)
+                title_text = re.sub(r'\s*(다시보기|뉴스룸|뉴스데스크)\s*', ' ', title_text)
+                title_text = re.sub(r'\s+', ' ', title_text).strip()
                 video_url = container.find_element(By.CSS_SELECTOR, '#video-title-link').get_attribute('href')
                 metadatas = container.find_elements(By.CSS_SELECTOR, "span")
                 for span in metadatas:
@@ -157,7 +168,7 @@ def trans_upload_date(date_text):
 
 
 def db_save(data):
-    backend_url = 'http://127.0.0.1:8000/news/news/'
+    backend_url = 'http://127.0.0.1:8000/news/headline/'
 
     try:
         api_data = {

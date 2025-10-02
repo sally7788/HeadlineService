@@ -33,6 +33,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     'drf_yasg',
     'rest_framework',
+    
 
     'news.apps.NewsConfig',
     'crawler.apps.CrawlerConfig',
