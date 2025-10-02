@@ -88,7 +88,7 @@ def crawl_youtube_data(request, urls=[]):
                     elif any(keyword in span_text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) and upload_date is None:
                         upload_date = trans_upload_date(span_text)
                 
-                now = datetime.datetime.now().isoformat()
+                now = timezone.now()
                 
                 crawled_data = {
                     "title": title_text,
@@ -151,38 +151,28 @@ def trans_upload_date(date_text):
     elif '주 전' in date_text:
         upload_time = now - datetime.timedelta(weeks=time)
     else:
-        return now
+        return now.date()
 
-    return upload_time
+    return upload_time.date()
 
 
 def db_save(data):
     backend_url = 'http://127.0.0.1:8000/news/news/'
 
     try:
-        if data['published_date']:
-            published_date_str = data['published_date'].isoformat()
-            if published_date_str.endswith('+00:00'):
-                published_date_str = published_date_str.replace('+00:00', 'Z')
-            elif not published_date_str.endswith('Z'):
-                published_date_str += 'Z'
-        else:
-            published_date_str = None
-
         api_data = {
             "title": data['title'],
             "publisher_id": data['publisher_id'],
             "url": data['url'],
-            "published_date": published_date_str,
+            "published_date": data['published_date'].isoformat(),
             "view_count": data['view_count'],
-            "crawled_at": data['crawled_at'] + "Z"
+            "crawled_at": data['crawled_at'].isoformat()
         }
         
         response = requests.post(
             backend_url, 
             json=api_data,
             headers={'Content-Type': 'application/json'},
-            timeout=10
         )
         
         if response.status_code in [200, 201]:
