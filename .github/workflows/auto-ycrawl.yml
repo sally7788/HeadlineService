@@ -29,30 +29,21 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Setup Chrome and Display
+    - name: Setup Chrome
       run: |
         # Chrome 안정 버전 설치
         sudo apt-get update
-        sudo apt-get install -y wget gnupg software-properties-common
+        sudo apt-get install -y wget gnupg
         wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
-        
-        # 가상 디스플레이 설정 (필요시)
-        sudo apt-get install -y xvfb
         
         # Chrome 버전 확인
         google-chrome --version
         
         # 환경 변수 설정
         echo "GITHUB_ACTIONS=true" >> $GITHUB_ENV
-        echo "DISPLAY=:99" >> $GITHUB_ENV
-
-    - name: Start virtual display
-      run: |
-        # 가상 디스플레이 시작
-        sudo Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
 
     - name: Crawling
       run: |
@@ -63,8 +54,8 @@ jobs:
     - name: Commit and Push
       run: |
         git config --local user.email "joonseok.chung@gmail.com"
-        git config --local user.name "auto-ycrawl"
-        git add db.sqlite3
+        git config --local user.name "chungJS" 
+        git add news_project/db.sqlite3
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
