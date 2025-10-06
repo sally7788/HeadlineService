@@ -92,7 +92,7 @@ def crawl_youtube_data(request=None, crawl_until=7):
                         extracted_date = int(re.search(r'(\d+)', span_text).group(1))
                 
                 if extracted_date >= crawl_until:
-                    print(f"로딩 성공!")
+                    print(f"로딩 성공!") 
                     break
                 
                 new_height = driver.execute_script("return document.documentElement.scrollHeight")
@@ -104,6 +104,7 @@ def crawl_youtube_data(request=None, crawl_until=7):
             
             #스크롤링으로 로딩한 비디오 수가 만족할때 데이터 크롤링
             video_containers = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
+            print(len(video_containers))
             channel_element = driver.find_element(By.CSS_SELECTOR, "span.yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap")
             channel_name = channel_element.text.strip()
 

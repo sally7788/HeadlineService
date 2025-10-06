@@ -55,7 +55,7 @@ jobs:
       run: |
         git config --local user.email "joonseok.chung@gmail.com"
         git config --local user.name "chungJS" 
-        git add news_project/db.sqlite3
+        git add -f news_project/db.sqlite3
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
@@ -63,4 +63,4 @@ jobs:
           git push
         fi
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: $
