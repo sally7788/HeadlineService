@@ -34,14 +34,24 @@ def crawl_youtube_data(request=None, crawl_until=7):
     chrome_options.add_argument("--disable-features=TranslateUI")
     chrome_options.add_argument("--disable-ipc-flooding-protection")
 
+    # GitHub Actions 환경에서 Chrome 바이너리 위치 명시적으로 설정
     if os.environ.get('GITHUB_ACTIONS'):
         chrome_options.binary_location = "/usr/bin/google-chrome"
-        service = Service("/usr/local/bin/chromedriver")
+        print("GitHub Actions 환경에서 실행 중")
     else:
-        chrome_bin = os.environ.get('CHROME_BIN', '/usr/bin/chromium-browser')
-        if os.path.exists(chrome_bin):
+        # 로컬 환경
+        chrome_bin = os.environ.get('CHROME_BIN')
+        if chrome_bin and os.path.exists(chrome_bin):
             chrome_options.binary_location = chrome_bin
-        service = Service("/usr/bin/chromedriver")
+
+    # webdriver_manager를 사용한 ChromeDriver 자동 설정
+    try:
+        service = Service(ChromeDriverManager().install())
+        print(f"ChromeDriver 경로: {ChromeDriverManager().install()}")
+    except Exception as e:
+        print(f"ChromeDriverManager 에러: {e}")
+        # fallback으로 기본 경로 시도
+        service = Service()
 
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
