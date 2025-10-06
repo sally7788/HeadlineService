@@ -68,9 +68,11 @@ def crawl_youtube_data(request=None, crawl_until=7):
     urls = [
         "https://www.youtube.com/@MBCNEWS11/videos",
     ]
+    print("1")
 
     try:
         for url in urls:
+            print("2")
             driver.get(url)
             wait = WebDriverWait(driver, 10)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "ytd-rich-item-renderer")))
@@ -79,6 +81,7 @@ def crawl_youtube_data(request=None, crawl_until=7):
 
             #정해진 비디오 갯수가 로딩될 때까지 무한 스크롤링
             while True:
+                print("3")
                 driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight);")
                 time.sleep(SCROLL_PAUSE_TIME)
                 
@@ -103,12 +106,14 @@ def crawl_youtube_data(request=None, crawl_until=7):
                 last_height = new_height
             
             #스크롤링으로 로딩한 비디오 수가 만족할때 데이터 크롤링
+            print("4")
             video_containers = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
             print(len(video_containers))
             channel_element = driver.find_element(By.CSS_SELECTOR, "span.yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap")
             channel_name = channel_element.text.strip()
 
             for container in video_containers:
+                print("5")
                 title_text = ""
                 video_url = ""
                 view_count = 0
@@ -149,6 +154,7 @@ def crawl_youtube_data(request=None, crawl_until=7):
                     "published_date": upload_date,
                     "crawled_at": now,
                 }
+                print(crawled_data)
                 db_save(crawled_data)
 
         return JsonResponse({
