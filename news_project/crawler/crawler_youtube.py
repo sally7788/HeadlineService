@@ -33,27 +33,41 @@ def crawl_youtube_data(request=None, crawl_until=7):
     chrome_options.add_argument("--disable-renderer-backgrounding")
     chrome_options.add_argument("--disable-features=TranslateUI")
     chrome_options.add_argument("--disable-ipc-flooding-protection")
+    chrome_options.add_argument("--remote-debugging-port=9222")
 
     # GitHub Actions 환경에서 Chrome 바이너리 위치 명시적으로 설정
     if os.environ.get('GITHUB_ACTIONS'):
         chrome_options.binary_location = "/usr/bin/google-chrome"
         print("GitHub Actions 환경에서 실행 중")
-    else:
-        # 로컬 환경
-        chrome_bin = os.environ.get('CHROME_BIN')
-        if chrome_bin and os.path.exists(chrome_bin):
-            chrome_options.binary_location = chrome_bin
-
+        print(f"Chrome 바이너리: {chrome_options.binary_location}")
+    
     # webdriver_manager를 사용한 ChromeDriver 자동 설정
     try:
-        service = Service(ChromeDriverManager().install())
-        print(f"ChromeDriver 경로: {ChromeDriverManager().install()}")
+        driver_path = ChromeDriverManager().install()
+        print(f"ChromeDriver 경로: {driver_path}")
+        service = Service(driver_path)
     except Exception as e:
         print(f"ChromeDriverManager 에러: {e}")
-        # fallback으로 기본 경로 시도
-        service = Service()
+        # GitHub Actions에서 대체 경로 시도
+        if os.environ.get('GITHUB_ACTIONS'):
+            # 시스템에서 chromedriver 찾기
+            import shutil
+            chromedriver_path = shutil.which('chromedriver')
+            if chromedriver_path:
+                print(f"시스템 ChromeDriver 발견: {chromedriver_path}")
+                service = Service(chromedriver_path)
+            else:
+                print("ChromeDriver를 찾을 수 없습니다. 기본 Service 사용")
+                service = Service()
+        else:
+            service = Service()
 
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    try:
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        print("Chrome WebDriver 초기화 성공")
+    except Exception as e:
+        print(f"Chrome WebDriver 초기화 실패: {e}")
+        raise
     
     '''urls = [
         "https://www.youtube.com/@MBCNEWS11/videos",
