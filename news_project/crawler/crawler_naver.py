@@ -35,7 +35,7 @@ def post_to_backend(news_obj):
     try:
         data = {
             "title": news_obj.title,
-            "publisher": news_obj.publisher_id.id,
+            "publisher": news_obj.publisher_id,
             "url": news_obj.url,
             "published_date": news_obj.published_date.isoformat(),  
             "view_count": news_obj.view_count,
@@ -63,6 +63,7 @@ def post_to_backend(news_obj):
 
 # 네이버 인기 뉴스 크롤링 (7일 분량)
 def crawl_naver_ranking(days=7, top_n=20):
+    collected_articles=[]
     driver = get_driver()
     today = datetime.today()
 
@@ -128,6 +129,13 @@ def crawl_naver_ranking(days=7, top_n=20):
 
                             # API POST
                             post_to_backend(headline_obj)
+
+                            collected_articles.append({
+                                "title": title,
+                                "url": href,
+                                "published_date": str(published_date),
+                                "publisher": publisher.name
+                            })
                         
                         except Exception as e:
                             print("기사 처리 오류:", e)
@@ -142,7 +150,14 @@ def crawl_naver_ranking(days=7, top_n=20):
 
     driver.quit()
     print("전체 크롤링 및 POST 완료")
-
+    return collected_articles
 # 실행
 if __name__ == "__main__":
     crawl_naver_ranking(days=7, top_n=20)
+
+def crawl():
+    collected = crawl_naver_ranking(days=3, top_n=20)
+    return {"status": "success", 
+            "message": "네이버 뉴스 크롤링 완료",
+            "items": collected
+    }
