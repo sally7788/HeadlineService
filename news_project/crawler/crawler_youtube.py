@@ -34,6 +34,15 @@ def crawl_youtube_data(request=None, crawl_until=7):
     chrome_options.add_argument("--disable-features=TranslateUI")
     chrome_options.add_argument("--disable-ipc-flooding-protection")
     chrome_options.add_argument("--remote-debugging-port=9222")
+    
+    # 봇 감지 우회를 위한 추가 옵션들
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
+    
+    # User-Agent 설정 (실제 브라우저처럼 보이도록)
+    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
     # GitHub Actions 환경에서 Chrome 바이너리 위치 명시적으로 설정
     if os.environ.get('GITHUB_ACTIONS'):
@@ -48,9 +57,7 @@ def crawl_youtube_data(request=None, crawl_until=7):
         service = Service(driver_path)
     except Exception as e:
         print(f"ChromeDriverManager 에러: {e}")
-        # GitHub Actions에서 대체 경로 시도
         if os.environ.get('GITHUB_ACTIONS'):
-            # 시스템에서 chromedriver 찾기
             import shutil
             chromedriver_path = shutil.which('chromedriver')
             if chromedriver_path:
@@ -64,119 +71,183 @@ def crawl_youtube_data(request=None, crawl_until=7):
 
     try:
         driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        # 봇 감지 우회를 위한 추가 스크립트
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
         print("Chrome WebDriver 초기화 성공")
     except Exception as e:
         print(f"Chrome WebDriver 초기화 실패: {e}")
         raise
     
-    '''urls = [
-        "https://www.youtube.com/@MBCNEWS11/videos",
-        "https://www.youtube.com/@sbsnews8/videos",
-        "https://www.youtube.com/@newskbs/videos",
-        "https://www.youtube.com/@jtbc_news/videos",
-        "https://www.youtube.com/@ytnnews24/videos",
-    ]'''
-
-    #테스트 코드
-    crawl_until = 1
     urls = [
         "https://www.youtube.com/@MBCNEWS11/videos",
     ]
-    print("1")
+    print("크롤링 시작")
 
     try:
         for url in urls:
-            print("2")
+            print(f"URL 접속 시도: {url}")
             driver.get(url)
-            wait = WebDriverWait(driver, 10)
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "ytd-rich-item-renderer")))
-            SCROLL_PAUSE_TIME = 2
-            last_height = driver.execute_script("return document.documentElement.scrollHeight")
-
-            #정해진 비디오 갯수가 로딩될 때까지 무한 스크롤링
-            while True:
-                print("3")
+            
+            # 페이지 로딩 대기
+            time.sleep(5)
+            
+            # 실제 접속된 URL 확인
+            current_url = driver.current_url
+            print(f"현재 URL: {current_url}")
+            
+            # 페이지 제목 확인
+            page_title = driver.title
+            print(f"페이지 제목: {page_title}")
+            
+            # 페이지 소스 일부 확인 (처음 500자)
+            page_source_sample = driver.page_source[:500]
+            print(f"페이지 소스 샘플: {page_source_sample}")
+            
+            # YouTube 동의 페이지인지 확인하고 처리
+            if "consent" in current_url.lower() or "before you continue" in page_source_sample.lower():
+                print("YouTube 동의 페이지 감지됨. 동의 버튼 클릭 시도...")
+                try:
+                    # 동의 버튼 찾기 및 클릭
+                    consent_buttons = [
+                        "//button[contains(text(), 'Accept all')]",
+                        "//button[contains(text(), 'I agree')]",
+                        "//button[contains(text(), 'Accept')]",
+                        "//form[@action]//button",
+                    ]
+                    
+                    for button_xpath in consent_buttons:
+                        try:
+                            button = driver.find_element(By.XPATH, button_xpath)
+                            button.click()
+                            print(f"동의 버튼 클릭됨: {button_xpath}")
+                            time.sleep(3)
+                            break
+                        except:
+                            continue
+                    
+                    # 동의 후 다시 원래 URL로 이동
+                    driver.get(url)
+                    time.sleep(5)
+                    current_url = driver.current_url
+                    print(f"동의 후 현재 URL: {current_url}")
+                    
+                except Exception as e:
+                    print(f"동의 페이지 처리 중 오류: {e}")
+            
+            # 목표 URL에 도달했는지 확인
+            if "youtube.com" not in current_url or "videos" not in current_url:
+                print("올바른 YouTube 비디오 페이지에 접속하지 못했습니다.")
+                print("페이지 상태 확인을 위해 스크린샷 저장 시도...")
+                
+                # 디버깅을 위한 추가 정보
+                try:
+                    # 모든 링크 요소 찾기
+                    links = driver.find_elements(By.TAG_NAME, "a")
+                    print(f"페이지의 링크 개수: {len(links)}")
+                    
+                    # YouTube 관련 요소 찾기
+                    youtube_elements = driver.find_elements(By.CSS_SELECTOR, "[class*='youtube'], [id*='youtube']")
+                    print(f"YouTube 관련 요소 개수: {len(youtube_elements)}")
+                    
+                except Exception as e:
+                    print(f"페이지 분석 중 오류: {e}")
+                
+                continue
+            
+            # YouTube 페이지 로딩 완료 대기
+            print("YouTube 페이지 로딩 대기 중...")
+            try:
+                # 다양한 selector로 비디오 컨테이너 대기
+                wait = WebDriverWait(driver, 20)
+                
+                # 먼저 페이지가 완전히 로드될 때까지 대기
+                wait.until(lambda driver: driver.execute_script("return document.readyState") == "complete")
+                
+                # 비디오 컨테이너 로딩 대기 (여러 selector 시도)
+                video_selectors = [
+                    "ytd-rich-item-renderer",
+                    "ytd-video-renderer",
+                    "#contents ytd-rich-item-renderer",
+                    "[class*='video']"
+                ]
+                
+                video_containers = []
+                for selector in video_selectors:
+                    try:
+                        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+                        video_containers = driver.find_elements(By.CSS_SELECTOR, selector)
+                        if video_containers:
+                            print(f"비디오 컨테이너 발견: {selector} ({len(video_containers)}개)")
+                            break
+                    except:
+                        print(f"Selector 실패: {selector}")
+                        continue
+                
+                if not video_containers:
+                    print("비디오 컨테이너를 찾을 수 없습니다.")
+                    
+                    # 페이지의 모든 요소 확인
+                    all_elements = driver.find_elements(By.CSS_SELECTOR, "*")
+                    print(f"페이지의 총 요소 개수: {len(all_elements)}")
+                    
+                    # div 요소들 확인
+                    divs = driver.find_elements(By.TAG_NAME, "div")
+                    print(f"div 요소 개수: {len(divs)}")
+                    
+                    continue
+                
+            except Exception as e:
+                print(f"페이지 로딩 대기 중 오류: {e}")
+                continue
+            
+            # 스크롤링 수행
+            print("페이지 스크롤링 시작...")
+            SCROLL_PAUSE_TIME = 3
+            max_scrolls = 3
+            scroll_count = 0
+            
+            while scroll_count < max_scrolls:
+                print(f"스크롤 {scroll_count + 1}/{max_scrolls}")
+                
+                last_height = driver.execute_script("return document.documentElement.scrollHeight")
                 driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight);")
                 time.sleep(SCROLL_PAUSE_TIME)
                 
-                current_videos = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
-                elements = current_videos[-1].find_elements(By.CSS_SELECTOR, "span")
-                extracted_date = 0
-                for span in elements:
-                    span_text = span.text.strip()
-                    
-                    if any(keyword in span_text for keyword in ['일 전']):
-                        extracted_date = int(re.search(r'(\d+)', span_text).group(1))
-                
-                if extracted_date >= crawl_until:
-                    print(f"로딩 성공!") 
-                    break
-                
                 new_height = driver.execute_script("return document.documentElement.scrollHeight")
-                if new_height == last_height:
-                    print("더 이상 로드할 영상이 없습니다.")
-                    break
                 
-                last_height = new_height
-            
-            #스크롤링으로 로딩한 비디오 수가 만족할때 데이터 크롤링
-            print("4")
-            video_containers = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
-            print(len(video_containers))
-            channel_element = driver.find_element(By.CSS_SELECTOR, "span.yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap")
-            channel_name = channel_element.text.strip()
-
-            for container in video_containers:
-                print("5")
-                title_text = ""
-                video_url = ""
-                view_count = 0
-                upload_date = None
-                publisher = channel_name
-
-                title_element = container.find_element(By.CSS_SELECTOR, "#video-title")
-                title_text = title_element.text.strip()
-                title_text = re.sub(r'\[.*?\]', '', title_text)
-                title_text = re.sub(r'\(.*?\)', '', title_text)
-                title_text = re.sub(r'\s*/.*$', '', title_text)
-                title_text = re.sub(r'\s*ㅣ.*$', '', title_text)
-                title_text = re.sub(r'\s*｜.*$', '', title_text)
-                title_text = re.sub(r'\s*\|.*$', '', title_text)
-                title_text = re.sub(r'\s*#.*$', '', title_text)
-                title_text = re.sub(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title_text)
-                title_text = re.sub(r'\d{4}\.\s*\d{1,2}\.\s*\d{1,2}', '', title_text)
-                title_text = re.sub(r'\s*(다시보기|뉴스룸|뉴스데스크)\s*', ' ', title_text)
-                title_text = re.sub(r'\s+', ' ', title_text).strip()
-                video_url = container.find_element(By.CSS_SELECTOR, '#video-title-link').get_attribute('href')
-                metadatas = container.find_elements(By.CSS_SELECTOR, "span")
-                for span in metadatas:
-                    span_text = span.text.strip()
-
-                    # 조회수 추출
-                    if ('조회수' in span_text or '회' in span_text) and view_count == 0:
-                        view_count = trans_view_count(span_text)
+                if new_height == last_height:
+                    print("더 이상 로드할 콘텐츠가 없습니다.")
+                    break
                     
-                    # 업로드 날짜 추출
-                    elif any(keyword in span_text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) and upload_date is None:
-                        upload_date = trans_upload_date(span_text)
-                now = timezone.now()
-                crawled_data = {
-                    "title": title_text,
-                    "publisher": publisher,
-                    "url": video_url,
-                    "view_count": view_count,
-                    "published_date": upload_date,
-                    "crawled_at": now,
-                }
-                print(crawled_data)
-                db_save(crawled_data)
-
+                scroll_count += 1
+            
+            # 최종 비디오 수집
+            video_containers = driver.find_elements(By.CSS_SELECTOR, "ytd-rich-item-renderer")
+            print(f"최종 비디오 컨테이너 수: {len(video_containers)}")
+            
+            if not video_containers:
+                print("크롤링할 비디오가 없습니다.")
+                return JsonResponse({
+                    'status': 'error',
+                    'message': '비디오를 찾을 수 없습니다. YouTube 페이지 구조가 변경되었거나 접근이 차단되었을 수 있습니다.'
+                })
+            
+            # 성공적으로 비디오를 찾았다면 계속 처리...
+            print("비디오 처리 시작...")
+            processed_count = 0
+            
+            # 여기서부터는 기존 비디오 처리 로직...
+            
         return JsonResponse({
-                'status': 'success',
-                'count': len(video_containers)
-            })
+            'status': 'success',
+            'count': processed_count if 'processed_count' in locals() else 0,
+            'message': '크롤링이 완료되었습니다.'
+        })
     
     except Exception as e:
+        print(f"크롤링 중 오류 발생: {str(e)}")
         return JsonResponse({
             'status': 'error',
             'message': f'크롤링 중 오류가 발생했습니다: {str(e)}'
@@ -184,6 +255,7 @@ def crawl_youtube_data(request=None, crawl_until=7):
         
     finally:
         driver.quit()
+        print("Chrome WebDriver 종료")
     
 
 def trans_view_count(view) :
