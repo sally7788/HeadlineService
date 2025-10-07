@@ -14,6 +14,8 @@ django.setup()
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from news.models import Headline, Publisher
 
 # 제목 전처리 함수
@@ -26,14 +28,21 @@ def get_driver():
     options.add_argument("--headless")  # 브라우저 없이 실행
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(options=options)
-    return driver
+
+    #GitHub Actions
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        options.binary_location = "/usr/bin/google-chrome"
+        return webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
+
+    #로컬 실행
+    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    
 
 def post_to_backend(news_obj):
-    backend_url = 'http://127.0.0.1:8000/news/headline/'
+    backend_url = os.environ.get('BACKEND_URL', 'http://127.0.0.1:8000/news/headline/')
     
     try:
-        data = {
+        data = {    
             "title": news_obj.title,
             "publisher": news_obj.publisher_id,
             "url": news_obj.url,
