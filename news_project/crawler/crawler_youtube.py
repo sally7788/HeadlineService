@@ -238,7 +238,52 @@ def crawl_youtube_data(request=None, crawl_until=7):
             print("비디오 처리 시작...")
             processed_count = 0
             
-            # 여기서부터는 기존 비디오 처리 로직...
+            channel_element = driver.find_element(By.CSS_SELECTOR, "span.yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap")
+            channel_name = channel_element.text.strip()
+
+            for container in video_containers:
+                title_text = ""
+                video_url = ""
+                view_count = 0
+                upload_date = None
+                publisher = channel_name
+
+                title_element = container.find_element(By.CSS_SELECTOR, "#video-title")
+                title_text = title_element.text.strip()
+                title_text = re.sub(r'\[.*?\]', '', title_text)
+                title_text = re.sub(r'\(.*?\)', '', title_text)
+                title_text = re.sub(r'\s*/.*$', '', title_text)
+                title_text = re.sub(r'\s*ㅣ.*$', '', title_text)
+                title_text = re.sub(r'\s*｜.*$', '', title_text)
+                title_text = re.sub(r'\s*\|.*$', '', title_text)
+                title_text = re.sub(r'\s*#.*$', '', title_text)
+                title_text = re.sub(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', title_text)
+                title_text = re.sub(r'\d{4}\.\s*\d{1,2}\.\s*\d{1,2}', '', title_text)
+                title_text = re.sub(r'\s*(다시보기|뉴스룸|뉴스데스크)\s*', ' ', title_text)
+                title_text = re.sub(r'\s+', ' ', title_text).strip()
+                video_url = container.find_element(By.CSS_SELECTOR, '#video-title-link').get_attribute('href')
+                metadatas = container.find_elements(By.CSS_SELECTOR, "span")
+                for span in metadatas:
+                    span_text = span.text.strip()
+
+                    # 조회수 추출
+                    if ('조회수' in span_text or '회' in span_text) and view_count == 0:
+                        view_count = trans_view_count(span_text)
+                    
+                    # 업로드 날짜 추출
+                    elif any(keyword in span_text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) and upload_date is None:
+                        upload_date = trans_upload_date(span_text)
+                now = timezone.now()
+                crawled_data = {
+                    "title": title_text,
+                    "publisher": publisher,
+                    "url": video_url,
+                    "view_count": view_count,
+                    "published_date": upload_date,
+                    "crawled_at": now,
+                }
+                print(crawled_data)
+                db_save(crawled_data)
             
         return JsonResponse({
             'status': 'success',
