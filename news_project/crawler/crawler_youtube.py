@@ -1,3 +1,11 @@
+from django.http import JsonResponse
+from django.http import HttpResponse
+from django.utils import timezone
+import datetime
+import time
+import re
+import requests
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -6,11 +14,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import os
-import time
-import re
-from django.http import JsonResponse
-from django.utils import timezone
-import datetime
 
 def crawl_youtube_data(request=None, crawl_until=7):
     """
@@ -48,10 +51,21 @@ def crawl_youtube_data(request=None, crawl_until=7):
 
     try:
         driver_path = ChromeDriverManager().install()
+        print(f"ChromeDriver 경로: {driver_path}")
         service = Service(driver_path)
     except Exception as e:
         print(f"ChromeDriverManager 에러: {e}")
-        service = Service()
+        if os.environ.get('GITHUB_ACTIONS'):
+            import shutil
+            chromedriver_path = shutil.which('chromedriver')
+            if chromedriver_path:
+                print(f"시스템 ChromeDriver 발견: {chromedriver_path}")
+                service = Service(chromedriver_path)
+            else:
+                print("ChromeDriver를 찾을 수 없습니다. 기본 Service 사용")
+                service = Service()
+        else:
+            service = Service()
 
     try:
         driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -110,21 +124,27 @@ def crawl_youtube_data(request=None, crawl_until=7):
                     'message': '비디오를 찾을 수 없습니다.'
                 })
             
-            # 채널명 추출 (여러 선택자 시도)
+            # 채널명 추출 (더 정확한 선택자들)
             channel_name = "MBCNEWS"  # 기본값
             channel_selectors = [
-                "yt-formatted-string#text",
-                "span.yt-core-attributed-string",
+                "ytd-channel-name #text",
+                "yt-formatted-string#text:not([aria-label*='Skip'])",  # Skip navigation 제외
                 "#channel-name #text",
-                "ytd-channel-name #text"
+                "a#channel-name #text",
+                "#owner-text a",
+                "ytd-video-owner-renderer #text"
             ]
             
             for selector in channel_selectors:
                 try:
-                    channel_element = driver.find_element(By.CSS_SELECTOR, selector)
-                    if channel_element.text.strip():
-                        channel_name = channel_element.text.strip()
-                        print(f"채널명 추출 성공: {channel_name} (selector: {selector})")
+                    channel_elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    for elem in channel_elements:
+                        text = elem.text.strip()
+                        if text and 'skip' not in text.lower() and 'navigation' not in text.lower():
+                            channel_name = text
+                            print(f"채널명 추출 성공: {channel_name} (selector: {selector})")
+                            break
+                    if channel_name != "MBCNEWS":  # 기본값이 아니면 찾았다는 의미
                         break
                 except:
                     continue
@@ -185,16 +205,18 @@ def crawl_youtube_data(request=None, crawl_until=7):
                         
                         print(f"  Span {j}: '{span_text}'")
                         
-                        # 조회수 추출
-                        if ('조회수' in span_text or '회' in span_text) and view_count == 0:
+                        # 조회수 추출 (한국어/영어)
+                        if (('조회수' in span_text or '회' in span_text or 'views' in span_text.lower() or 'view' in span_text.lower()) 
+                            and view_count == 0):
                             try:
                                 view_count = trans_view_count(span_text)
                                 print(f"  --> 조회수 추출 성공: {view_count}")
                             except Exception as e:
                                 print(f"  --> 조회수 추출 실패: {e}")
                         
-                        # 업로드 날짜 추출
-                        elif any(keyword in span_text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) and upload_date is None:
+                        # 업로드 날짜 추출 (한국어/영어)
+                        elif (any(keyword in span_text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) or
+                              any(keyword in span_text.lower() for keyword in ['ago', 'hour', 'day', 'week', 'month', 'year', 'minute'])) and upload_date is None:
                             try:
                                 upload_date = trans_upload_date(span_text)
                                 print(f"  --> 업로드 날짜 추출 성공: {upload_date}")
@@ -224,14 +246,18 @@ def crawl_youtube_data(request=None, crawl_until=7):
                                     
                                     print(f"    '{text}'")
                                     
-                                    if ('조회수' in text or '회' in text) and view_count == 0:
+                                    # 조회수 추출 (한국어/영어)
+                                    if (('조회수' in text or '회' in text or 'views' in text.lower() or 'view' in text.lower()) 
+                                        and view_count == 0):
                                         try:
                                             view_count = trans_view_count(text)
                                             print(f"    --> 조회수 추출: {view_count}")
                                         except:
                                             pass
                                     
-                                    elif any(keyword in text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) and upload_date is None:
+                                    # 업로드 날짜 추출 (한국어/영어)
+                                    elif (any(keyword in text for keyword in ['일 전', '주 전', '개월 전', '년 전', '시간 전', '분 전']) or
+                                          any(keyword in text.lower() for keyword in ['ago', 'hour', 'day', 'week', 'month', 'year', 'minute'])) and upload_date is None:
                                         try:
                                             upload_date = trans_upload_date(text)
                                             print(f"    --> 날짜 추출: {upload_date}")
@@ -292,14 +318,28 @@ def crawl_youtube_data(request=None, crawl_until=7):
         print("Chrome WebDriver 종료")
 
 def trans_view_count(view):
-    """조회수 텍스트를 숫자로 변환"""
+    """조회수 텍스트를 숫자로 변환 (한국어/영어 지원)"""
     print(f"조회수 변환 입력: '{view}'")
     
-    view_text = view.replace('조회수', '').replace('회', '').strip()
+    view_text = view.replace('조회수', '').replace('회', '').replace('views', '').replace('view', '').strip()
     view_text = view_text.replace('.', '').replace(',', '')
     
     try:
-        if '만' in view_text:
+        # 영어 처리
+        if 'K' in view_text.upper():
+            number_str = view_text.upper().replace('K', '')
+            number = float(number_str) 
+            result = int(number * 1000)
+        elif 'M' in view_text.upper():
+            number_str = view_text.upper().replace('M', '')
+            number = float(number_str)
+            result = int(number * 1000000)
+        elif 'B' in view_text.upper():
+            number_str = view_text.upper().replace('B', '')
+            number = float(number_str)
+            result = int(number * 1000000000)
+        # 한국어 처리
+        elif '만' in view_text:
             number_str = view_text.replace('만', '')
             number = float(number_str) 
             result = int(number * 10000)
@@ -317,7 +357,7 @@ def trans_view_count(view):
         return 0
 
 def trans_upload_date(date_text):
-    """업로드 날짜 텍스트로 업로드 시간 계산"""
+    """업로드 날짜 텍스트로 업로드 시간 계산 (한국어/영어 지원)"""
     print(f"날짜 변환 입력: '{date_text}'")
     
     now = timezone.now()
@@ -329,7 +369,21 @@ def trans_upload_date(date_text):
             
         time_value = int(numbers[0])
 
-        if '분 전' in date_text:
+        # 영어 처리
+        if 'minute' in date_text.lower() or 'min' in date_text.lower():
+            upload_time = now - datetime.timedelta(minutes=time_value)
+        elif 'hour' in date_text.lower():
+            upload_time = now - datetime.timedelta(hours=time_value)
+        elif 'day' in date_text.lower():
+            upload_time = now - datetime.timedelta(days=time_value)
+        elif 'week' in date_text.lower():
+            upload_time = now - datetime.timedelta(weeks=time_value)
+        elif 'month' in date_text.lower():
+            upload_time = now - datetime.timedelta(days=time_value * 30)
+        elif 'year' in date_text.lower():
+            upload_time = now - datetime.timedelta(days=time_value * 365)
+        # 한국어 처리
+        elif '분 전' in date_text:
             upload_time = now - datetime.timedelta(minutes=time_value)
         elif '시간 전' in date_text:
             upload_time = now - datetime.timedelta(hours=time_value)
