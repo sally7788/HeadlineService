@@ -14,6 +14,8 @@ django.setup()
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from news.models import Headline, Publisher
 
 # 제목 전처리 함수
@@ -26,16 +28,23 @@ def get_driver():
     options.add_argument("--headless")  # 브라우저 없이 실행
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(options=options)
-    return driver
+
+    #GitHub Actions
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        options.binary_location = "/usr/bin/google-chrome"
+        return webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
+
+    #로컬 실행
+    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    
 
 def post_to_backend(news_obj):
-    backend_url = 'http://127.0.0.1:8000/news/headline/'
+    backend_url = os.environ.get('BACKEND_URL', 'http://127.0.0.1:8000/news/headline/')
     
     try:
-        data = {
+        data = {    
             "title": news_obj.title,
-            "publisher": news_obj.publisher_id.id,
+            "publisher": news_obj.publisher_id,
             "url": news_obj.url,
             "published_date": news_obj.published_date.isoformat(),  
             "view_count": news_obj.view_count,
@@ -63,6 +72,7 @@ def post_to_backend(news_obj):
 
 # 네이버 인기 뉴스 크롤링 (7일 분량)
 def crawl_naver_ranking(days=7, top_n=20):
+    collected_articles=[]
     driver = get_driver()
     today = datetime.today()
 
@@ -128,6 +138,13 @@ def crawl_naver_ranking(days=7, top_n=20):
 
                             # API POST
                             post_to_backend(headline_obj)
+
+                            collected_articles.append({
+                                "title": title,
+                                "url": href,
+                                "published_date": str(published_date),
+                                "publisher": publisher.name
+                            })
                         
                         except Exception as e:
                             print("기사 처리 오류:", e)
@@ -142,7 +159,14 @@ def crawl_naver_ranking(days=7, top_n=20):
 
     driver.quit()
     print("전체 크롤링 및 POST 완료")
-
+    return collected_articles
 # 실행
 if __name__ == "__main__":
     crawl_naver_ranking(days=7, top_n=20)
+
+def crawl():
+    collected = crawl_naver_ranking(days=3, top_n=20)
+    return {"status": "success", 
+            "message": "네이버 뉴스 크롤링 완료",
+            "items": collected
+    }
