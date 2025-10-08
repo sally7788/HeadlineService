@@ -9,16 +9,41 @@ import requests
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+import os
 
-def crawl_youtube_data(request, crawl_until=7):
+def crawl_youtube_data(request=None, crawl_until=7):
     """
     유튜브 링크로 접속해서 무한 스크롤을 하여 받아온 비디오 갯수만큼의 데이터를 크롤링
     """
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    driver = webdriver.Chrome(options=chrome_options)
+    chrome_options = Options() 
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-web-security")
+    chrome_options.add_argument("--allow-running-insecure-content")
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    chrome_options.add_argument("--disable-features=TranslateUI")
+    chrome_options.add_argument("--disable-ipc-flooding-protection")
+
+    if os.environ.get('GITHUB_ACTIONS'):
+        chrome_options.binary_location = "/usr/bin/google-chrome"
+        service = Service("/usr/local/bin/chromedriver")
+    else:
+        chrome_bin = os.environ.get('CHROME_BIN', '/usr/bin/chromium-browser')
+        if os.path.exists(chrome_bin):
+            chrome_options.binary_location = chrome_bin
+        service = Service("/usr/bin/chromedriver")
+
+    driver = webdriver.Chrome(service=service, options=chrome_options)
     
     '''urls = [
         "https://www.youtube.com/@MBCNEWS11/videos",
