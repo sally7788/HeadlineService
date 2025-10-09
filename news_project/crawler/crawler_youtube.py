@@ -423,17 +423,7 @@ def trans_upload_date(date_text):
 
 
 def db_save(data):
-    """데이터베이스 저장 - HeadlineSerializer 직접 사용"""
-    if os.environ.get('GITHUB_ACTIONS'):
-        print("GitHub Actions 환경 - DB 저장 시뮬레이션")
-        print(f"저장할 데이터: {data}")
-        return True
-    
     try:
-        # published_date가 None인 경우 현재 날짜로 설정
-        if data['published_date'] is None:
-            data['published_date'] = timezone.now().date()
-        
         # serializer에 전달할 데이터 포맷 정리
         api_data = {
             "title": data['title'],
