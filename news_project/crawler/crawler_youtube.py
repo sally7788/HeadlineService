@@ -4,7 +4,20 @@ from django.utils import timezone
 import datetime
 import time
 import re
-import requests
+import os
+import sys
+
+# Django 설정 추가
+import django
+from django.conf import settings
+
+# Django 앱이 아직 설정되지 않았다면 설정
+if not settings.configured:
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'news_project.settings')
+    django.setup()
+
+# HeadlineSerializer import
+from news.serializers import HeadlineSerializer
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -13,7 +26,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-import os
+
 
 def crawl_youtube_data(request=None, crawl_until=7):
     """
@@ -317,6 +330,7 @@ def crawl_youtube_data(request=None, crawl_until=7):
         driver.quit()
         print("Chrome WebDriver 종료")
 
+
 def trans_view_count(view):
     """조회수 텍스트를 숫자로 변환 (한국어/영어 지원)"""
     print(f"조회수 변환 입력: '{view}'")
@@ -355,6 +369,7 @@ def trans_view_count(view):
     except Exception as e:
         print(f"조회수 변환 실패: {e}")
         return 0
+
 
 def trans_upload_date(date_text):
     """업로드 날짜 텍스트로 업로드 시간 계산 (한국어/영어 지원)"""
@@ -406,21 +421,20 @@ def trans_upload_date(date_text):
         print(f"날짜 변환 실패: {e}")
         return now.date()
 
+
 def db_save(data):
-    """데이터베이스 저장"""
+    """데이터베이스 저장 - HeadlineSerializer 직접 사용"""
     if os.environ.get('GITHUB_ACTIONS'):
         print("GitHub Actions 환경 - DB 저장 시뮬레이션")
         print(f"저장할 데이터: {data}")
         return True
     
-    # 로컬 환경에서의 실제 저장 로직
-    backend_url = 'http://127.0.0.1:8000/news/headline/'
-
     try:
         # published_date가 None인 경우 현재 날짜로 설정
         if data['published_date'] is None:
             data['published_date'] = timezone.now().date()
         
+        # serializer에 전달할 데이터 포맷 정리
         api_data = {
             "title": data['title'],
             "publisher": data['publisher'],
@@ -430,20 +444,21 @@ def db_save(data):
             "crawled_at": data['crawled_at'].isoformat()
         }
         
-        response = requests.post(
-            backend_url, 
-            json=api_data,
-            headers={'Content-Type': 'application/json'},
-            timeout=10
-        )
+        print(f"Serializer에 전달할 데이터: {api_data}")
         
-        if response.status_code in [200, 201]:
-            print("데이터 저장 성공")
+        # HeadlineSerializer 사용해서 데이터 저장
+        serializer = HeadlineSerializer(data=api_data)
+        
+        if serializer.is_valid():
+            # 저장 성공
+            instance = serializer.save()
+            print(f"데이터 저장 성공 - ID: {instance.id}")
             return True
         else:
-            print(f"Failed to send data. Status code: {response.status_code}")
+            # 유효성 검사 실패
+            print(f"Serializer 유효성 검사 실패: {serializer.errors}")
             return False
         
     except Exception as e:
-        print(f"Unexpected error in db_save: {e}")
+        print(f"db_save에서 예상치 못한 오류: {e}")
         return False
