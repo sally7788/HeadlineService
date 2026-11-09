@@ -1,8 +1,6 @@
 name: Auto youtube news crawler
 
 on:
-  schedule:
-    - cron: "0 * * * *" # Run every hour
   workflow_dispatch:
   
 jobs:
